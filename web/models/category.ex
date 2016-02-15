@@ -1,18 +1,13 @@
-defmodule Rumbl.Video do
+defmodule Rumbl.Category do
   use Rumbl.Web, :model
 
-  schema "videos" do
-    field :url, :string
-    field :title, :string
-    field :description, :string
+  schema "categories" do
+    field :name, :string
 
-    belongs_to :user, Rumbl.User
-    belongs_to :category, Rumbl.Category
-    
     timestamps
   end
 
-  @required_fields ~w(url title description)
+  @required_fields ~w(name)
   @optional_fields ~w()
 
   @doc """
