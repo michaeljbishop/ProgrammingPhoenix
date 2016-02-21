@@ -7,13 +7,13 @@ defmodule Rumbl.Auth do
 
   def call(conn, repo) do
     user_id = get_session(conn, :user_id)
-    cond do
       # pass through current user if it exists. This allows
       # us to add logged in users from the testing harness
+    cond do
       user = conn.assigns[:current_user] ->
         put_current_user(conn, user)
       user = user_id && repo.get(Rumbl.User, user_id) ->
-        assign(conn, :current_user, user)
+        put_current_user(conn, user)
       true ->
         assign(conn, :current_user, nil) 
     end
