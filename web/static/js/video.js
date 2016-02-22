@@ -30,6 +30,15 @@ let Video = {
     vidChannel.on("new_annotation", (resp) => {
       this.renderAnnotation(msgContainer, resp);
     })
+
+    msgContainer.addEventListener("click", e => {
+      e.preventDefault();
+      let seconds = e.target.getAttribute("data-seek") ||
+        e.target.parentNode.getAttribute("data-seek");
+      if(!seconds){return;}
+
+      Player.seekTo(seconds);
+    })
     
     vidChannel.join()
     .receive("ok", resp => {
