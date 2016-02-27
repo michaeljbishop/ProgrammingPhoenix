@@ -27,8 +27,12 @@ defmodule Rumbl.InfoSys do
     {pid, monitor_ref, query_ref}
   end
 
-  defp await_results(children, _opts) do
-    await_result(children, [], :infinity)
+  defp await_results(children, opts) do
+    timeout = opts[:timeout] || 5000
+    timer = Process.send_after(self(), :timedout, timeout)
+    results = await_result(children, [], :infinity)
+    cleanup(timer)
+    results
   end
 
   defp await_result([head|tail], acc, timeout) do
@@ -45,11 +49,38 @@ defmodule Rumbl.InfoSys do
         # Ignore the dead process and don't report results but
         # go to the next one.
         await_result(tail, acc, timeout)
+      :timedout ->
+        # This is from the book, but couldn't
+        # we consolidate this by simply re-calling ourself with the same
+        # arguments, but a timeout of 0?
+        # await_result([head|tail], acc, 0) ?
+        kill(pid, monitor_ref)
+        await_result(tail, acc, 0)
+    after
+      timeout ->
+        kill(pid, monitor_ref)
+        await_result(tail, acc, 0)
     end
   end
 
   defp await_result([], acc, _) do
     acc
+  end
+
+  defp kill(pid, ref) do
+    Process.demonitor(ref, [:flush])
+    Process.exit(pid, :kill)
+  end
+
+  defp cleanup(timer) do
+    :erlang.cancel_timer(timer)
+    receive do
+      # This flushes the :timedout message from our inbox in
+      # case if it was already sent
+      :timedout -> :ok
+    after
+      0 -> :ok
+    end
   end
 
 end
