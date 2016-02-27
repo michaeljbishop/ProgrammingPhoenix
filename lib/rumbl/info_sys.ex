@@ -14,12 +14,42 @@ defmodule Rumbl.InfoSys do
     backends = opts[:backends] || @backends
     backends
     |> Enum.map(&spawn_query(&1, query, limit))
+    |> await_results(opts)
+    |> Enum.sort(&(&1.score) >= &2.score)
+    |> Enum.take(limit)
   end
 
   def spawn_query(backend, query, limit) do
     query_ref = make_ref()
     opts = [backend, query, query_ref, self(), limit]
     {:ok, pid} = Supervisor.start_child(Rumbl.InfoSys.Supervisor, opts)
-    {pid, query_ref}
+    monitor_ref = Process.monitor(pid)
+    {pid, monitor_ref, query_ref}
   end
+
+  defp await_results(children, _opts) do
+    await_result(children, [], :infinity)
+  end
+
+  defp await_result([head|tail], acc, timeout) do
+    # destructure the head
+    {pid, monitor_ref, query_ref} = head
+    receive do
+      {:results, ^query_ref, results} ->
+        # Stop monitoring the process. Flush the message queue in case
+        # we received a DOWN message before processing the result.
+        Process.demonitor(monitor_ref, [:flush])
+        # Iterate to the next one by adding the results to the accumulator
+        await_result(tail, results ++ acc, timeout)
+      {:DOWN, ^monitor_ref, :process, ^pid, _reason} ->
+        # Ignore the dead process and don't report results but
+        # go to the next one.
+        await_result(tail, acc, timeout)
+    end
+  end
+
+  defp await_result([], acc, _) do
+    acc
+  end
+
 end
